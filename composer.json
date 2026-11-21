@@ -1,8 +1,36 @@
 {
     "name": "apiempresas/apiempresas-php",
-    "description": "SDK oficial de APIEmpresas.es para PHP",
+    "description": "Official PHP SDK for SpainCompanyAPI (APIEmpresas.es): Spanish company data by tax ID (CIF/NIF), KYB verification, bulk tax ID validation before invoicing, directors, BORME filings and sanctions screening.",
+    "keywords": [
+        "spain",
+        "spanish companies",
+        "company data api",
+        "kyb",
+        "know your business",
+        "company verification",
+        "business verification",
+        "tax id validation",
+        "cif",
+        "nif",
+        "vat",
+        "vies",
+        "e-invoicing",
+        "borme",
+        "commercial registry",
+        "sanctions screening",
+        "apiempresas",
+        "spaincompanyapi",
+        "empresas",
+        "registro mercantil"
+    ],
+    "homepage": "https://spaincompanyapi.com",
     "type": "library",
     "license": "MIT",
+    "support": {
+        "email": "soporte@apiempresas.es",
+        "docs": "https://spaincompanyapi.com/docs",
+        "source": "https://github.com/abasmartinc/apiempresas-php"
+    },
     "authors": [
         {
             "name": "APIEmpresas",

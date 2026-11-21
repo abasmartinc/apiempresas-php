@@ -4,17 +4,29 @@ namespace ApiEmpresas;
 
 use ApiEmpresas\Exceptions\ApiException;
 use ApiEmpresas\Resources\Companies;
+use ApiEmpresas\Resources\Watchlist;
+use ApiEmpresas\Resources\Webhooks;
+use ApiEmpresas\Resources\Tenders;
+use ApiEmpresas\Resources\Sanctions;
 
 class ApiEmpresas
 {
-    /** Versión del SDK, enviada en el User-Agent. */
-    public const VERSION = '1.1.0';
+    /** SDK version, sent in the User-Agent. */
+    public const VERSION = '1.6.1';
 
     private string $apiKey;
     private string $baseUrl;
     private int $timeout;
     
     public Companies $companies;
+    /** (Pro/Business) Vigilancia de empresas. */
+    public Watchlist $watchlist;
+    /** (Business) Webhooks. */
+    public Webhooks $webhooks;
+    /** (Business) Licitaciones públicas abiertas. */
+    public Tenders $tenders;
+    /** (Business) Listas de sanciones (UE, ONU, OFAC). */
+    public Sanctions $sanctions;
 
     /**
      * ApiEmpresas constructor.
@@ -36,6 +48,10 @@ class ApiEmpresas
 
         // Inicializar recursos
         $this->companies = new Companies($this);
+        $this->watchlist = new Watchlist($this);
+        $this->webhooks = new Webhooks($this);
+        $this->tenders = new Tenders($this);
+        $this->sanctions = new Sanctions($this);
     }
 
     /**
@@ -74,6 +90,15 @@ class ApiEmpresas
 
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        // Cabeceras de respuesta: X-Request-Id y Retry-After van a la excepción
+        $respHeaders = [];
+        curl_setopt($ch, CURLOPT_HEADERFUNCTION, static function ($ch, string $line) use (&$respHeaders): int {
+            $parts = explode(':', $line, 2);
+            if (count($parts) === 2) {
+                $respHeaders[strtolower(trim($parts[0]))] = trim($parts[1]);
+            }
+            return strlen($line);
+        });
         curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
         // Descomentar para debug si hay problemas de SSL en local:
         // curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
@@ -102,10 +127,57 @@ class ApiEmpresas
                 $message = $response; // Fallback si devuelve HTML
             }
 
-            throw new ApiException($message, $statusCode, $errorCode, $isJson ? $decodedData : null);
+            throw new ApiException($message, $statusCode, $errorCode, $isJson ? $decodedData : null, $respHeaders);
         }
 
         return $isJson ? $decodedData : ['raw' => $response];
+    }
+
+    /**
+     * Consumo de tu API Key: consultas del periodo, cupo, saldo de créditos e historial de
+     * las últimas empresas consultadas ['stats' => [...], 'history' => [...]]. No gasta
+     * consultas. No está en el Sandbox.
+     */
+    public function usage(): array
+    {
+        $response = $this->request('GET', '/usage');
+        return $response['data'] ?? [];
+    }
+
+    /**
+     * (Todos los planes, desde 1.5.0) Estadísticas del BORME por mes o año, para España o una
+     * provincia: constituciones, disoluciones, extinciones, concursos, cambios de capital y de
+     * domicilio y fusiones, desde 2009. Devuelve los datos con 'meta' dentro. 1 consulta.
+     * No está en el Sandbox.
+     *
+     * @param array $options metrics, province (MADRID o 28), from y to (AAAA-MM o AAAA), group (month | year)
+     */
+    public function stats(array $options = []): array
+    {
+        $q = [];
+        foreach ($options as $k => $v) {
+            if ($v === null || $v === '') {
+                continue;
+            }
+            $q[$k] = is_array($v) ? implode(',', $v) : $v;
+        }
+        $qs = http_build_query($q);
+        $response = $this->request('GET', '/stats' . ($qs !== '' ? "?$qs" : ''));
+        $data = $response['data'] ?? [];
+        if (isset($response['meta'])) {
+            $data['meta'] = $response['meta'];
+        }
+        return $data;
+    }
+
+    /**
+     * Valores válidos de los filtros: provincias, tramos de tamaño, estados, opciones del
+     * radar, prioridades y eventos de webhook. No gasta consultas. También está en el Sandbox.
+     */
+    public function catalog(): array
+    {
+        $response = $this->request('GET', '/catalog');
+        return $response['data'] ?? [];
     }
 
     private static function extractErrorMessage(array $data): ?string
